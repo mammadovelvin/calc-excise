@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8">
+  <title>Maşın Hesablama + Aksiz</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #2b5876, #4e4376);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      width: 360px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 10px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 20px;
+      background: #4e4376;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #2b5876;
+    }
+
+    .result {
+      margin-top: 15px;
+      background: #f1f1f1;
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    .aksiz {
+      margin-top: 10px;
+      padding: 10px;
+      background: #e8e8e8;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Avtomobil Aksiz Hesablama</h2>
+
+    <label>İstehsal tarixi (gün.ay.il)</label>
+    <input type="text" id="tarix" maxlength="10" placeholder="gg.aa.iiii">
+
+    <label>Motor həcmi (sm<sup>3</sup>)</label>
+    <input type="number" id="motor" placeholder="məs: 1500">
+
+    <button onclick="hesabla()">Hesabla</button>
+
+    <div class="result" id="netice"></div>
+  </div>
+
+  <script>
+    // 🔹 Tarixi avtomatik formatla
+    document.getElementById("tarix").addEventListener("input", function(e) {
+      let value = e.target.value.replace(/\D/g, "");
+      let formatted = "";
+
+      if (value.length > 0) formatted = value.substring(0, 2);
+      if (value.length > 2) formatted += "." + value.substring(2, 4);
+      if (value.length > 4) formatted += "." + value.substring(4, 8);
+
+      e.target.value = formatted;
+    });
+
+    // 🔹 Real tarix yoxlaması + gələcək tarix
+    function tarixDuzgundurmu(tarix) {
+      let h = tarix.split(".");
+      if (h.length !== 3) return false;
+
+      let g = parseInt(h[0]);
+      let a = parseInt(h[1]);
+      let i = parseInt(h[2]);
+
+      if (isNaN(g) || isNaN(a) || isNaN(i)) return false;
+      if (i < 1900 || i > new Date().getFullYear()) return false;
+
+      let d = new Date(i, a - 1, g);
+      if (d.getFullYear() !== i || d.getMonth() !== a - 1 || d.getDate() !== g)
+        return false;
+
+      let bugun = new Date();
+      if (d > bugun) return false;
+
+      return true;
+    }
+
+    // 🔹 Yaşı il-ay-gün dəqiqliyi ilə hesabla
+    function yasHesabla(g1, a1, i1) {
+      let bugun = new Date();
+      let g2 = bugun.getDate();
+      let a2 = bugun.getMonth() + 1;
+      let i2 = bugun.getFullYear();
+
+      let yasIl = i2 - i1;
+      let yasAy = a2 - a1;
+      let yasGun = g2 - g1;
+
+      if (yasGun < 0) {
+        yasAy--;
+        let evvelkiAyGunleri = new Date(i2, a2 - 1, 0).getDate();
+        yasGun += evvelkiAyGunleri;
+      }
+
+      if (yasAy < 0) {
+        yasIl--;
+        yasAy += 12;
+      }
+
+      return {il: yasIl, ay: yasAy, gun: yasGun};
+    }
+
+    // 🔹 Aksiz vergisini hesabla (benzin)
+    function aksizHesabla(motor, yas) {
+      let old = 0; // Köhnə qayda 2025
+      let yeni = 0; // Yeni qayda 2026
+
+      // --- Köhnə qayda 2025 ---
+      if (motor <= 2000) old = motor * 0.30;
+      else if (motor <= 3000) old = 600 + (motor - 2000) * 5;
+      else if (motor <= 5000) old = 18600 + (motor - 4000) * 35;
+      else old = 53600 + (motor - 5000) * 70;
+
+      // 7 il və daha artıq maşın üçün aksiz əmsalı
+      if (yas.il >= 7 || (yas.il === 7 && (yas.ay >= 0 || yas.gun >= 0))) {
+        old *= 1.2;
+      }
+
+      // --- Yeni qayda 2026 ---
+      if (motor <= 2000) yeni = motor * 0.30;
+      else if (motor <= 3000) yeni = 600 + (motor - 2000) * 5;
+      else if (motor <= 5000) yeni = 18600 + (motor - 4000) * 35;
+      else yeni = 53600 + (motor - 5000) * 70;
+
+      if (yas.il >= 7 || (yas.il === 7 && (yas.ay >= 0 || yas.gun >= 0))) {
+        yeni *= 1.5;
+      }
+
+      return {old: old.toFixed(2), yeni: yeni.toFixed(2)};
+    }
+
+    function hesabla() {
+      let tarix = document.getElementById("tarix").value;
+      let motor = parseInt(document.getElementById("motor").value);
+
+      if (tarix.length !== 10 || !tarixDuzgundurmu(tarix)) {
+        alert("Zəhmət olmasa REAL və keçmiş tarix daxil edin (məs: 15.06.2018)");
+        return;
+      }
+
+      if (!motor || motor <= 0) {
+        alert("Motor həcmini düzgün daxil edin");
+        return;
+      }
+
+      let h = tarix.split(".");
+      let g1 = parseInt(h[0]);
+      let a1 = parseInt(h[1]);
+      let i1 = parseInt(h[2]);
+
+      let yas = yasHesabla(g1, a1, i1);
+      let aksiz = aksizHesabla(motor, yas);
+      let ferq = (aksiz.yeni - aksiz.old).toFixed(2);
+
+      document.getElementById("netice").innerHTML =
+        "Maşının yaşı: <b>" + yas.il + " il " + yas.ay + " ay " + yas.gun + " gün</b><br>" +
+        "Motor həcmi: <b>" + motor + " sm<sup>3</sup></b>" +
+        "<div class='aksiz'>" +
+        "<b>Köhnə qayda 2025:</b> " + aksiz.old + " AZN<br>" +
+        "<b>Yeni qayda 2026:</b> " + aksiz.yeni + " AZN<br>" +
+        "<b>Fərq:</b> <span style='color:red;'>" + ferq + " AZN</span>" +
+        "</div>";
+    }
+  </script>
+
+</body>
+</html>
